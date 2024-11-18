@@ -1,0 +1,70 @@
+
+Gurobi 10.0.3 (win64) logging started Sat Nov  9 17:09:13 2024
+
+Set parameter LogFile to value "r2.AS.lp.log"
+Gurobi Optimizer version 10.0.3 build v10.0.3rc0 (win64)
+
+CPU model: 12th Gen Intel(R) Core(TM) i5-1240P, instruction set [SSE2|AVX|AVX2]
+Thread count: 12 physical cores, 16 logical processors, using up to 2 threads
+
+Optimize a model with 690 rows, 400 columns and 4000 nonzeros
+Model fingerprint: 0x006daaae
+Variable types: 0 continuous, 400 integer (400 binary)
+Coefficient statistics:
+  Matrix range     [1e+00, 7e+00]
+  Objective range  [1e+00, 1e+00]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [1e+00, 9e+00]
+Presolve removed 449 rows and 328 columns
+Presolve time: 0.01s
+Presolved: 241 rows, 72 columns, 1704 nonzeros
+Variable types: 0 continuous, 72 integer (72 binary)
+Found heuristic solution: objective 16.0000000
+
+Root relaxation: objective 5.000000e-01, 39 iterations, 0.00 seconds (0.00 work units)
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+     0     0    0.50000    0    6   16.00000    0.50000  96.9%     -    0s
+H    0     0                       2.0000000    0.50000  75.0%     -    0s
+     0     0    0.50000    0    6    2.00000    0.50000  75.0%     -    0s
+
+Explored 1 nodes (39 simplex iterations) in 0.01 seconds (0.01 work units)
+Thread count was 2 (of 16 available processors)
+
+Solution count 2: 2 16 
+
+Optimal solution found (tolerance 1.00e-04)
+Best objective 2.000000000000e+00, best bound 2.000000000000e+00, gap 0.0000%
+
+Gurobi 10.0.3 (win64) logging started Sat Nov  9 17:12:02 2024
+
+Set parameter LogFile to value "r2.AS.lp.log"
+Gurobi Optimizer version 10.0.3 build v10.0.3rc0 (win64)
+
+CPU model: 12th Gen Intel(R) Core(TM) i5-1240P, instruction set [SSE2|AVX|AVX2]
+Thread count: 12 physical cores, 16 logical processors, using up to 2 threads
+
+Optimize a model with 689 rows, 400 columns and 4000 nonzeros
+Model fingerprint: 0xfa3c71d7
+Variable types: 0 continuous, 400 integer (400 binary)
+Coefficient statistics:
+  Matrix range     [1e+00, 7e+00]
+  Objective range  [1e+00, 1e+00]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [1e+00, 9e+00]
+Presolve removed 176 rows and 192 columns
+Presolve time: 0.01s
+Presolved: 513 rows, 208 columns, 3536 nonzeros
+Variable types: 0 continuous, 208 integer (208 binary)
+Found heuristic solution: objective 16.0000000
+Found heuristic solution: objective 1.0000000
+
+Explored 0 nodes (0 simplex iterations) in 0.01 seconds (0.01 work units)
+Thread count was 2 (of 16 available processors)
+
+Solution count 2: 1 16 
+
+Optimal solution found (tolerance 1.00e-04)
+Best objective 1.000000000000e+00, best bound 1.000000000000e+00, gap 0.0000%
