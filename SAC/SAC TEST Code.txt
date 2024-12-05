@@ -1,0 +1,329 @@
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <bitset>
+#include <array>
+#include <vector>
+#include <cmath>
+
+
+const std::array<unsigned char, 16> S_BOX = {
+    0x5, 0xD, 0x9, 0x4, 0x6, 0x3, 0xF, 0x1,
+    0xB, 0x8, 0xE, 0x0, 0x7, 0x2, 0xC, 0xA
+
+};
+
+std::bitset<8> rotateLeft(const std::bitset<8>& b, size_t m) {
+    return (b << m) | (b >> (8 - m));
+}
+//x3,x2,x1,x0
+std::bitset<4> applySBox(const std::bitset<4>& b) {
+    unsigned char index = static_cast<unsigned char>(b.to_ulong());
+    unsigned char sboxValue = S_BOX[index];
+    return std::bitset<4>(sboxValue);
+}
+
+std::bitset<32> processBitsThroughSBox(const std::bitset<32>& input) {
+    std::bitset<32> result;
+
+    for (int i = 0; i < 8; ++i) {
+
+        std::bitset<4> extractedBits;
+        extractedBits[0] = input[i];
+        extractedBits[1] = input[i + 8];
+        extractedBits[2] = input[i + 16];
+        extractedBits[3] = input[i + 24];
+        std::bitset<4> transformedBits = applySBox(extractedBits);
+        result[i] = transformedBits[0];
+        result[i + 8] = transformedBits[1];
+        result[i + 16] = transformedBits[2];
+        result[i + 24] = transformedBits[3];
+    }
+
+    return result;
+}
+
+
+
+std::vector<std::bitset<8>> splitBitset32To8(const std::bitset<32>& input) {
+    std::vector<std::bitset<8>> subkeys(4);
+    for (int i = 0; i < 4; ++i) {
+        subkeys[i] = std::bitset<8>((input >> (i * 8)).to_ulong());
+    }
+    return subkeys;
+}
+
+
+
+const std::array<int, 32> P_BOX = {
+    0, 4, 8, 12, 16, 20, 24, 28,
+    1, 5, 9, 13, 17, 21, 25, 29,
+    2, 6, 10, 14, 18, 22, 26, 30,
+    3, 7, 11, 15, 19, 23, 27, 31
+};
+
+std::bitset<32> applyPBox(const std::bitset<32>& b) {
+    std::bitset<32> permuted;
+    for (size_t i = 0; i < 32; ++i) {
+        bool bit = b[i];
+        permuted[P_BOX[i]] = bit;
+    }
+
+    return permuted;
+}
+
+std::bitset<64> encrypt(const std::string& M, const std::string& Key, int rounds) {
+    std::bitset<64> result;
+    std::bitset<32> Reg_0(Key.substr(0, 32));//round1
+    std::bitset<32> Reg_1(Key.substr(32, 32));//round2
+    std::bitset<32> Reg_2(Key.substr(64, 32));//round3
+    std::bitset<32> Reg_3(Key.substr(96, 32));//round4
+
+
+    std::vector<std::bitset<32>> Reg = { Reg_0, Reg_1, Reg_2, Reg_3 };
+    std::bitset<32> A1ApplyPBox;
+    for (int j = 4; j < rounds; ++j) {
+        A1ApplyPBox = applyPBox(Reg[j - 4]);
+        std::bitset<32> processedBits = processBitsThroughSBox(A1ApplyPBox);
+
+
+        std::bitset<32> newReg = processedBits ^ Reg[j - 1];
+        Reg.push_back(newReg);
+    }
+
+
+    std::vector<std::vector<std::bitset<8>>> SubKeys;
+    for (int i = 0; i < rounds; ++i) {
+
+        SubKeys.push_back(splitBitset32To8(Reg[i]));
+    }
+
+
+    std::vector<std::vector<std::bitset<8>>> M_segments(rounds + 1, std::vector<std::bitset<8>>(8));
+    M_segments[0] = {
+        std::bitset<8>(M.substr(0, 8)),
+        std::bitset<8>(M.substr(8, 8)),
+        std::bitset<8>(M.substr(16, 8)),
+        std::bitset<8>(M.substr(24, 8)),
+        std::bitset<8>(M.substr(32, 8)),
+        std::bitset<8>(M.substr(40, 8)),
+        std::bitset<8>(M.substr(48, 8)),
+        std::bitset<8>(M.substr(56, 8))
+    };
+
+    std::vector<std::vector<std::bitset<8>>> rotated_M_outputs(rounds, std::vector<std::bitset<8>>(8));
+    std::vector<std::vector<std::bitset<8>>> AddRound(rounds, std::vector<std::bitset<8>>(8));
+
+    for (int j = 0; j < rounds; j++) {
+        for (int i = 0; i < 8; i += 2) {
+
+
+            AddRound[j][i] = M_segments[j][i] ^ SubKeys[j][(6 - i) / 2];
+            std::bitset<8>& M_i = AddRound[j][i];
+            std::bitset<4> M_i_nibble1 = (M_i >> 4).to_ulong();
+            std::bitset<4> M_i_nibble2 = (M_i & std::bitset<8>(0x0F)).to_ulong();
+            std::bitset<4> M_i_outputNibble1 = applySBox(M_i_nibble1);
+            std::bitset<4> M_i_outputNibble2 = applySBox(M_i_nibble2);
+            std::bitset<8> M_i_output = (M_i_outputNibble1.to_ulong() << 4) | M_i_outputNibble2.to_ulong();
+            std::bitset<8> rotated_M_i_output = rotateLeft(M_i_output, 1);
+            rotated_M_outputs[j][i] = rotated_M_i_output;
+            M_segments[j][i + 1] = M_segments[j][i + 1] ^ rotated_M_outputs[j][i];
+
+
+        }
+        if (j < rounds)
+        {
+            if (j % 2 == 0) {
+
+                M_segments[j + 1][0] = M_segments[j][7];
+                M_segments[j + 1][1] = M_segments[j][2];
+                M_segments[j + 1][2] = M_segments[j][1];
+                M_segments[j + 1][3] = M_segments[j][4];
+                M_segments[j + 1][4] = M_segments[j][3];
+                M_segments[j + 1][5] = M_segments[j][6];
+                M_segments[j + 1][6] = M_segments[j][5];
+                M_segments[j + 1][7] = M_segments[j][0];
+
+
+                std::string concat = M_segments[j][7].to_string()
+                    + M_segments[j][2].to_string()
+                    + M_segments[j][1].to_string()
+                    + M_segments[j][4].to_string()
+                    + M_segments[j][3].to_string()
+                    + M_segments[j][6].to_string()
+                    + M_segments[j][5].to_string()
+                    + M_segments[j][0].to_string();
+                result = std::bitset<64>(concat);
+
+
+            }
+            else {
+                M_segments[j + 1][0] = M_segments[j][1];
+                M_segments[j + 1][1] = M_segments[j][2];
+                M_segments[j + 1][2] = M_segments[j][3];
+                M_segments[j + 1][3] = M_segments[j][0];
+                M_segments[j + 1][4] = M_segments[j][5];
+                M_segments[j + 1][5] = M_segments[j][6];
+                M_segments[j + 1][6] = M_segments[j][7];
+                M_segments[j + 1][7] = M_segments[j][4];
+                std::string concat = M_segments[j][1].to_string()
+                    + M_segments[j][2].to_string()
+                    + M_segments[j][3].to_string()
+                    + M_segments[j][0].to_string()
+                    + M_segments[j][5].to_string()
+                    + M_segments[j][6].to_string()
+                    + M_segments[j][7].to_string()
+                    + M_segments[j][4].to_string();
+                result = std::bitset<64>(concat);
+            }
+        }
+    }return result;
+
+}
+
+
+
+    int main() {
+        std::ifstream infile("AES128-random-1-chopped.txt");
+        if (!infile.is_open()) {
+            std::cerr << "Unable to open the file: AES128-random-1-chopped.txt" << std::endl;
+            return 1;
+        }
+
+
+        std::string line;
+        std::bitset<64> c_prime;
+        std::vector<std::bitset<64>> results;
+        std::string Key = "10000111111101110100100101100001011100011010111110011000010000011111011111000101101010000111100101111111010110100111000111010111";
+         int rounds = 10;
+        std::vector<std::string> lines;
+
+        while (std::getline(infile, line)) {
+            if (line.length() == 64) {
+                lines.push_back(line);
+            }
+            else {
+                std::cerr << "Invalid bitset length" << std::endl;
+            }
+        }
+
+        std::vector<std::bitset<64>> original_results(lines.size());
+        for (size_t i = 0; i < lines.size(); ++i) {
+            original_results[i] = encrypt(lines[i], Key, rounds);
+        }
+
+        infile.close();
+        std::vector<std::string> processed_M = lines;
+        std::vector<std::vector<int>> Matrix(64, std::vector<int>(64, 0));
+        for (int i = 0; i < lines.size(); i++) {
+            std::string modified_line = processed_M[i];
+            for (int j = 0; j < 64; j++) {
+                modified_line = processed_M[i];
+                modified_line[j] = (processed_M[i][j] == '0') ? '1' : '0';
+                c_prime = encrypt(modified_line, Key, rounds);
+                std::bitset<64>  xored_result = original_results[i] ^ c_prime;
+
+                for (int i = 63; i >= 0; --i)
+                {
+                    if (xored_result[i] == 1)
+                    {
+
+                        Matrix[j][63 - i] += 1;
+                    }
+
+                }
+            }
+            std::cout << std::endl;
+        }
+
+        std::ofstream outfile("r10.matrix_result.txt");
+        if (outfile.is_open()) {
+            for (int j = 63; j >= 0; --j) {
+                for (int k = 63; k >= 0; --k) {
+                    outfile << Matrix[j][k];
+                    outfile << " ";
+
+                }
+                outfile << std::endl;
+            }
+            outfile.close();
+            std::cout << "Matrix result successfully written to r10.matrix_result.txt" << std::endl;
+        }
+        else {
+            std::cerr << "Unable to open file for writing." << std::endl;
+        }
+
+
+        for (int j = 63; j >= 0; --j) {
+            for (int k = 63; k >= 0; --k) {
+                std::cout << Matrix[j][k] << " ";
+            }
+            std::cout << std::endl;
+        }
+
+
+        std::vector<int> flattened;
+        for (const auto& row : Matrix) {
+            for (const auto& element : row) {
+                flattened.push_back(element);
+            }
+        }
+
+
+
+        int bin1 = 0, bin2 = 0, bin3 = 0, bin4 = 0, bin5 = 0, bin6 = 0, bin7 = 0, bin8 = 0;
+        for (const auto& value : flattened) {
+            if (value >= 0 && value <= 523700) {
+                bin1++;
+            }
+            else if (value >= 523701 && value <= 523944) {
+                bin2++;
+            }
+            else if (value >= 523945 && value <= 524125) {
+                bin3++;
+            }
+            else if (value >= 524126 && value <= 524288) {
+                bin4++;
+            }
+            else if (value >= 524289 && value <= 524452) {
+                bin5++;
+            }
+            else if (value >= 524453 && value <= 524634) {
+                bin6++;
+            }
+
+            else if (value >= 524635 && value <= 524878) {
+                bin7++;
+            }
+
+            else if (value >= 524879 && value <= 1048576) {
+                bin8++;
+            }
+        }
+
+
+        std::cout << "Bin 1: " << bin1 << std::endl;
+        std::cout << "Bin 2: " << bin2 << std::endl;
+        std::cout << "Bin 3: " << bin3 << std::endl;
+        std::cout << "Bin 4: " << bin4 << std::endl;
+        std::cout << "Bin 5: " << bin5 << std::endl;
+        std::cout << "Bin 6: " << bin6 << std::endl;
+        std::cout << "Bin 7: " << bin7 << std::endl;
+        std::cout << "Bin 8: " << bin8 << std::endl;
+
+
+        std::vector<int> observed = { bin1, bin2, bin3, bin4, bin5, bin6, bin7, bin8 };
+
+
+       
+        //prob1: 0.125394, prob2: 0.125437, prob3: 0.124275, prob4: 0.124894, prob5: 0.125634, prob6: 0.124776 ,  prob7: 0.125,  prob8: 0.12459
+        std::vector<double> expected = { 131485.138944, 131530.227712, 130311.7824, 130960.850944, 131736.797184, 130837.118976, 131072, 130642.08384 };
+   
+
+
+        return 0;
+
+    }
+
+
+
